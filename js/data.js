@@ -742,6 +742,9 @@ const Save = {
       if (!state.player.items) state.player.items = { potion: 0, mpPotion: 0, phoenixFeather: 0 };
       if (!('phoenixFeather' in state.player.items)) state.player.items.phoenixFeather = 0;
       if (!state.achievements) state.achievements = [];
+      if (!state.clearedDungeons) state.clearedDungeons = [];
+      if (!state.player.skills) state.player.skills = {};
+      if (!state.player.materials) state.player.materials = {};
       const defaultSkills = GameData.playerDefault.skills;
       for (const id of Object.keys(defaultSkills)) {
         if (!(id in state.player.skills)) state.player.skills[id] = 0;
