@@ -124,6 +124,7 @@ const App = {
 
   // clearedDungeons をもとに GameData のフラグを復元
   _applyDungeonUnlocks() {
+    GameData.dungeons.forEach((d, i) => { d.unlocked = i === 0; });
     for (const clearedId of this.state.clearedDungeons) {
       const idx = GameData.dungeons.findIndex(d => d.id === clearedId);
       if (idx >= 0 && idx + 1 < GameData.dungeons.length) {

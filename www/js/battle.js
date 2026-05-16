@@ -10,6 +10,7 @@ const Battle = {
 
   start(dungeonId) {
     const dungeon = GameData.dungeons.find(d => d.id === dungeonId);
+    if (!dungeon || !dungeon.unlocked) return;
     this.state = {
       dungeon,
       roomIndex: 0,
@@ -348,8 +349,8 @@ const Battle = {
       } else {
         // 2回目以降はそのまま冒険画面へ
         const p = App.player;
-        p.hp = p.hpMax;
-        p.mp = p.mpMax;
+        p.hp = p.hpMax + calcEquipStats(p).hp;
+        p.mp = p.mpMax + calcEquipStats(p).mp;
         App.save();
         App.navigateTo("adventure", "left");
       }
@@ -428,8 +429,8 @@ const Battle = {
   retreat() {
     this.cancelAuto();
     const p = App.player;
-    p.hp = p.hpMax;
-    p.mp = p.mpMax;
+    p.hp = p.hpMax + calcEquipStats(p).hp;
+    p.mp = p.mpMax + calcEquipStats(p).mp;
     App.save();
     App.navigateTo("adventure", "left");
   },
@@ -509,8 +510,8 @@ Screens.battle = function () {
     clearTimeout(Battle._autoTimer);
     el.innerHTML = _buildGameover();
     el.querySelector("#btn-gameover-title").addEventListener("click", () => {
-      p.hp = p.hpMax;
-      p.mp = p.mpMax;
+      p.hp = p.hpMax + calcEquipStats(p).hp;
+      p.mp = p.mpMax + calcEquipStats(p).mp;
       App.save();
       App.navigateTo("title", "left");
     });
@@ -522,8 +523,8 @@ Screens.battle = function () {
     clearTimeout(Battle._autoTimer);
     el.innerHTML = _buildCleared(s);
     el.querySelector("#btn-cleared-title").addEventListener("click", () => {
-      p.hp = p.hpMax;
-      p.mp = p.mpMax;
+      p.hp = p.hpMax + calcEquipStats(p).hp;
+      p.mp = p.mpMax + calcEquipStats(p).mp;
       App.save();
       App.navigateTo("title", "left");
     }
