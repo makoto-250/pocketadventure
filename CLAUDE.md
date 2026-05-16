@@ -1,111 +1,116 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+このファイルは、リポジトリのコードを扱う際に Claude Code (claude.ai/code) へ提供するガイダンスです。
 
-## Development
+## 開発
 
-No build step — open `index.html` directly in a browser. No package manager, no transpilation, no test suite.
+ビルド手順なし — `index.html` をブラウザで直接開くだけ。パッケージマネージャー・トランスパイル・テストスイートは不要。
 
-Syntax-check JS files with Node:
+JS ファイルの構文チェック:
 ```
 node --check js/data.js
 node --check js/app.js
 node --check js/battle.js
 ```
 
-## Architecture
+## Git運用
+- コードを変更・実装したら必ずgit add, commit, pushまで行うこと
+- コミットメッセージは変更内容を簡潔に日本語で書くこと
+- pushは`git push origin main`で行うこと
 
-Single-page browser RPG. Three JS files loaded in order via `<script>` tags in `index.html`:
+## アーキテクチャ
+
+シングルページのブラウザ RPG。`index.html` の `<script>` タグで以下の順に読み込まれる JS ファイル 3 本構成:
 
 ```
 data.js  →  app.js  →  battle.js
 ```
 
-Each file depends on globals from the files before it.
+各ファイルは前のファイルのグローバル変数に依存している。
 
 ### `js/data.js`
-All static game data in one `GameData` object: `playerDefault`, `dungeons`, `enemies`, `skills`, `recipes`, `materials`.
+静的なゲームデータをすべて `GameData` オブジェクト 1 つにまとめている: `playerDefault`、`dungeons`、`enemies`、`skills`、`recipes`、`materials`。
 
-Also contains the `Save` object (localStorage key `pocketAdventure_save`) and `getLvUpCost(lv)`.
+`Save` オブジェクト（localStorage キー: `pocketAdventure_save`）と `getLvUpCost(lv)` も含む。
 
-**Key constraint:** `GameData.dungeons[].unlocked` is in-memory only — it is not persisted. On every load, `App._applyDungeonUnlocks()` must re-apply the flag from the saved `clearedDungeons` array. Any dungeon unlock must go through `App.state.clearedDungeons`.
+**重要な制約:** `GameData.dungeons[].unlocked` はメモリ上のみ — 永続化されない。読み込みのたびに `App._applyDungeonUnlocks()` が保存済みの `clearedDungeons` 配列からフラグを再適用する必要がある。ダンジョン解放は必ず `App.state.clearedDungeons` を経由すること。
 
-#### Dungeon data
-Each dungeon has `bgColor` set to `url('images/danjon_N.png') center/cover no-repeat` — used as background in both the dungeon card banner and the battle screen. `icon` is an empty string for all dungeons (image-only banners).
+#### ダンジョンデータ
+各ダンジョンの `bgColor` は `url('images/danjon_N.png') center/cover no-repeat` — ダンジョンカードのバナーとバトル画面の両方で背景として使用する。`icon` は全ダンジョンで空文字列（バナーは画像のみ）。
 
-#### Recipe ranks
-`recipes` uses `rank: 1–7` for weapons/armor (auto-grouped in the smithing screen) and `rank: 0` for accessories (shown in a separate section). Each rank 2–7 requires one unique material (rare enemy or boss drop) plus common materials.
+#### レシピランク
+`recipes` は武器・防具に `rank: 1–7`（鍛冶画面で自動グループ化）、アクセサリーに `rank: 0`（別セクションに表示）を使用する。ランク 2–7 はそれぞれ固有素材（レアエネミーまたはボスドロップ）1 個 + 共通素材が必要。
 
-#### Skills
-Skills start at level 0 (unlearned/unusable). `upgradeCosts[lv]` is used as the index — `upgradeCosts[0]` is the learn cost (lv 0→1), `upgradeCosts[1]` is the first upgrade (lv 1→2), etc.
+#### スキル
+スキルはレベル 0（未習得・使用不可）から始まる。`upgradeCosts[lv]` をインデックスとして使用 — `upgradeCosts[0]` が習得コスト（lv 0→1）、`upgradeCosts[1]` が最初の強化コスト（lv 1→2）、以降同様。
 
-#### LV up
-`getLvUpCost(lv)` returns `lv * 100`. LV up is purchased with money in the training screen (no EXP system).
+#### レベルアップ
+`getLvUpCost(lv)` は `lv * 100` を返す。レベルアップは訓練画面でゴールドを消費して購入する（経験値システムなし）。
 
 ### `js/app.js`
-Two concerns:
+2 つの責務を持つ:
 
-1. **`App`** — global state container and router.
-   - `App.state = { player, clearedDungeons }` is the only thing saved to localStorage.
-   - `App.navigateTo(screenId, direction)` replaces `#app` innerHTML with the result of `Screens[screenId]()`. Direction `null` skips the slide animation.
+1. **`App`** — グローバル状態コンテナ兼ルーター。
+   - `App.state = { player, clearedDungeons }` のみ localStorage に保存される。
+   - `App.navigateTo(screenId, direction)` は `#app` の innerHTML を `Screens[screenId]()` の結果で置き換える。`direction` が `null` の場合はスライドアニメーションをスキップ。
 
-2. **`Screens`** — object of screen-builder functions (`title`, `adventure`, `smithing`, `equipment`, `training`, `achievements`, `settings`). Each returns a DOM element. `Screens.battle` is defined in `battle.js` and added to this object at runtime.
+2. **`Screens`** — 画面ビルダー関数のオブジェクト（`title`、`adventure`、`smithing`、`equipment`、`training`、`achievements`、`settings`）。各関数は DOM 要素を返す。`Screens.battle` は `battle.js` で定義され、実行時にこのオブジェクトへ追加される。
 
-Helper functions below `Screens`: `calcEquipStats`, `canCraftRecipe`, `alreadyOwned`, `craftItem`, `equipItem`, `unequipItem`, `upgradeSkill`, `levelUp`, `recipeCard`, `skillCard`, `dungeonCard`, etc. These are global functions accessed by both `app.js` screens and `battle.js`.
+`Screens` の下に定義されているヘルパー関数: `calcEquipStats`、`canCraftRecipe`、`alreadyOwned`、`craftItem`、`equipItem`、`unequipItem`、`upgradeSkill`、`levelUp`、`recipeCard`、`skillCard`、`dungeonCard` など。これらは `app.js` の画面と `battle.js` の両方からアクセスされるグローバル関数。
 
-#### Dungeon selection
-`dungeonCard()` renders the card. Unlocked dungeons get class `dungeon-card-enter` and `data-dungeon` on the card `<div>` itself — the entire card is tappable (no inner button). Locked dungeons show a lock message only.
+#### ダンジョン選択
+`dungeonCard()` がカードをレンダリングする。解放済みダンジョンはカード `<div>` 自体に `dungeon-card-enter` クラスと `data-dungeon` が付く — カード全体がタップ可能（内部にボタンなし）。ロック中ダンジョンはロックメッセージのみ表示。
 
-#### Dungeon unlock flow
-1st clear: `nextRoom()` adds to `clearedDungeons`, unlocks next dungeon in `GameData.dungeons`, shows cleared screen.  
-2nd+ clear: skips cleared screen, restores HP/MP, returns to adventure screen.
+#### ダンジョン解放フロー
+初回クリア: `nextRoom()` が `clearedDungeons` に追加し、`GameData.dungeons` の次のダンジョンを解放、クリア画面を表示。  
+2 回目以降のクリア: クリア画面をスキップし、HP/MP を回復して冒険画面へ戻る。
 
 ### `js/battle.js`
-Owns all combat logic and extends `Screens` with `Screens.battle`.
+戦闘ロジック全体を担い、`Screens.battle` として `Screens` を拡張する。
 
-**`Battle.state`** (in-memory, not saved between sessions):
+**`Battle.state`**（メモリ上のみ、セッション間で保存されない）:
 ```
 { dungeon, roomIndex, enemies[], phase, log[], actionMenu,
   gainedMoney, gainedDrops, lastDamage, lastHeal, showDamageAnim, autoMode }
 ```
 
-**Phase flow:** `player` → (action chosen) → `result` → (next room) → loops back to `player`, or → `cleared` / `gameover`.
+**フェーズフロー:** `player` → （行動選択）→ `result` → （次の部屋へ）→ `player` に戻るループ、または → `cleared` / `gameover`。
 
-**Turn order (per action):** AGI is compared at action-selection time, not on room entry. If `enemy.agi > playerAgi`, enemy attacks first; if player kills enemy, no counter-attack fires. Enemy first-strike on room entry was intentionally removed.
+**行動順（アクションごと）:** AGI の比較は部屋入場時ではなく行動選択時に行う。`enemy.agi > playerAgi` の場合は敵が先攻。プレイヤーが敵を倒した場合、反撃は発生しない。部屋入場時の敵先制攻撃は意図的に削除済み。
 
-**Multiple enemies per room:**
-- 始まりの森: rooms 1–5 → 1 enemy, rooms 6–7 → 1–2 enemies, room 8 → boss (1)
-- 石炭の洞窟: 1–2 enemies per room, boss room → 1
-- 古代の遺跡: 1–3 enemies per room, boss room → 1
-- Player normal attack and single-target skill always hit `enemies[0]` (leftmost).
-- All-target skill loops through all `enemies[]`.
-- Enemy turn: all living enemies attack the player.
+**1 部屋に複数の敵:**
+- 始まりの森: 1〜5 部屋目 → 敵 1 体、6〜7 部屋目 → 1〜2 体、8 部屋目 → ボス（1 体）
+- 石炭の洞窟: 各部屋 1〜2 体、ボス部屋 → 1 体
+- 古代の遺跡: 各部屋 1〜3 体、ボス部屋 → 1 体
+- プレイヤーの通常攻撃と単体スキルは常に `enemies[0]`（左端）にヒット。
+- 全体スキルは `enemies[]` 全体をループ処理。
+- 敵のターン: 生存している全敵がプレイヤーを攻撃。
 
-**HP/MP restore:** On retreat, game over, dungeon clear — HP and MP are always fully restored before returning to title/adventure.
+**HP/MP 回復:** 退却・ゲームオーバー・ダンジョンクリア時 — タイトル・冒険画面に戻る前に HP と MP を必ず全回復する（装備ボーナス込みの実効最大値まで）。
 
-**`Battle.render()`** is the internal re-render used during combat (no slide animation). It also schedules the auto-attack timer and attaches the tap-to-cancel listener when `autoMode` is true.
+**`Battle.render()`** は戦闘中に使用する内部再レンダリング（スライドアニメーションなし）。`autoMode` が true の場合、オート攻撃タイマーのスケジュールとタップキャンセルリスナーのアタッチも行う。
 
-**Auto mode:** `Battle.toggleAuto()` / `Battle.cancelAuto()`. Timer fires `playerAttack()` every 700 ms during `player` phase and `nextRoom()` every 900 ms during `result` phase. Cancelled on gameover, cleared, or any non-button screen tap.
+**オートモード:** `Battle.toggleAuto()` / `Battle.cancelAuto()`。`player` フェーズ中は 700 ms ごとに `playerAttack()` を、`result` フェーズ中は 900 ms ごとに `nextRoom()` を実行。ゲームオーバー・クリア・ボタン以外の画面タップでキャンセル。
 
-### Images
-Enemy sprites: `images/enemy_N.png` — referenced via `image` field on each enemy in `GameData.enemies`. Falls back to `icon` emoji if no image. Dungeon backgrounds: `images/danjon_N.png`. Title screen background: `images/top.png`. Logo: `images/logoname_1.png`.
+### 画像
+敵スプライト: `images/enemy_N.png` — `GameData.enemies` の各敵の `image` フィールドで参照。画像がない場合は `icon` の絵文字にフォールバック。ダンジョン背景: `images/danjon_N.png`。タイトル画面背景: `images/top.png`。ロゴ: `images/logoname_1.png`。
 
-### Data flow summary
+### データフロー概要
 
 ```
-GameData (static)
-     ↓ read-only
+GameData (静的)
+     ↓ 読み取り専用
 App.state.player  ←→  localStorage  (Save.load / App.save)
      ↓
-Battle.state  (ephemeral, lives for one dungeon run)
+Battle.state  (一時的、1 ダンジョン実行中のみ存在)
 ```
 
-Equip stats are never stored on the player — `calcEquipStats(player)` computes them on the fly from `player.equip`.
+装備ステータスはプレイヤーに保存されない — `calcEquipStats(player)` が `player.equip` から毎回計算する。
 
-### Adding content
+### コンテンツの追加
 
-- **New enemy:** add entry to `GameData.enemies`, reference its id in a dungeon's `enemies`/`boss`/`rareEnemy` field. Add `image: "images/enemy_N.png"` to use a sprite.
-- **New recipe:** add to `GameData.recipes` with a `rank` (1–7) and `category` (`weapon`/`armor`/`accessory`). Rank 0 = accessory. The smithing screen auto-groups by rank.
-- **New material:** add to `GameData.materials` with `rare: true/false`, add to `playerDefault.materials` with initial count `0`.
-- **New dungeon background:** set `bgColor: "url('images/danjon_N.png') center/cover no-repeat"` on the dungeon entry in `GameData.dungeons`.
-- **New screen:** add a builder function to `Screens` in `app.js`, then call `App.navigateTo("yourScreen")` to reach it.
+- **新しい敵:** `GameData.enemies` にエントリを追加し、ダンジョンの `enemies`/`boss`/`rareEnemy` フィールドでその id を参照する。スプライトを使う場合は `image: "images/enemy_N.png"` を追加。
+- **新しいレシピ:** `GameData.recipes` に `rank`（1〜7）と `category`（`weapon`/`armor`/`accessory`）を指定して追加。ランク 0 = アクセサリー。鍛冶画面はランクで自動グループ化する。
+- **新しい素材:** `GameData.materials` に `rare: true/false` を指定して追加し、`playerDefault.materials` に初期値 `0` で追加する。
+- **新しいダンジョン背景:** `GameData.dungeons` のダンジョンエントリに `bgColor: "url('images/danjon_N.png') center/cover no-repeat"` を設定する。
+- **新しい画面:** `app.js` の `Screens` にビルダー関数を追加し、`App.navigateTo("yourScreen")` で遷移する。
